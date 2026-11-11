@@ -60,7 +60,6 @@
             background-color: #8d0801;
         }
 
-        /* 改為 4 × 4 網格排版 */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -167,7 +166,7 @@
     <h2>16宮格音效板</h2>
 
     <div class="toolbar">
-        <button class="action-btn stop-btn" id="stopAllBtn">🛑 停止播放</button>
+        <button class="action-btn stop-btn" id="stopAllBtn">🛑 全部停止</button>
         <button class="action-btn" id="batchBtn">📁 批次匯入</button>
         <input type="file" id="batchInput" accept="audio/*" multiple>
     </div>
@@ -175,9 +174,9 @@
     <div class="grid-container" id="grid"></div>
 
     <div class="tip-text">
-        • 點擊按鈕：播放音效 / 長按：更換音效<br>
-        • 右上角 **✏️**：改名 | **✕**：清除音效<br>
-        • 資料會自動永久儲存於手機內
+        • 點擊：播放 / 再點一次：停止該音效<br>
+        • 長按按鈕：更換音效<br>
+        • 右上角 **✏️**：改名 | **✕**：清除音效
     </div>
 
     <input type="file" id="singleInput" accept="audio/*">
@@ -255,7 +254,6 @@
         const audioCache = {}; 
         let targetButtonId = null;
 
-        // 改為迴圈 1 至 16 (4×4)
         async function init() {
             grid.innerHTML = '';
             for (let i = 1; i <= 16; i++) {
@@ -305,7 +303,7 @@
 
                 card.addEventListener('click', (e) => {
                     if (isLongPress) return;
-                    playSound(i);
+                    togglePlaySound(i);
                 });
 
                 grid.appendChild(card);
@@ -341,17 +339,21 @@
 
         stopAllBtn.addEventListener('click', () => {
             for (let id in audioCache) {
-                const item = audioCache[id];
-                if (item && item.audio) {
-                    item.audio.pause();
-                    item.audio.currentTime = 0;
-                }
-                const card = document.getElementById(`card-${id}`);
-                if (card) {
-                    card.classList.remove('playing');
-                }
+                stopSingleSound(id);
             }
         });
+
+        function stopSingleSound(id) {
+            if (audioCache[id] && audioCache[id].audio) {
+                const audio = audioCache[id].audio;
+                audio.pause();
+                audio.currentTime = 0;
+            }
+            const card = document.getElementById(`card-${id}`);
+            if (card) {
+                card.classList.remove('playing');
+            }
+        }
 
         async function renameSound(id) {
             const item = await getSound(id);
@@ -367,16 +369,21 @@
             }
         }
 
-        function playSound(id) {
+        function togglePlaySound(id) {
             if (audioCache[id]) {
                 const audio = audioCache[id].audio;
                 const card = document.getElementById(`card-${id}`);
 
-                audio.pause();
-                audio.currentTime = 0;
-                audio.play().then(() => {
-                    card.classList.add('playing');
-                }).catch(err => alert("播放失敗：" + err.message));
+                // 如果該格子正在播放中 -> 停止播放
+                if (!audio.paused) {
+                    stopSingleSound(id);
+                } else {
+                    // 沒在播放 -> 開始播放
+                    audio.currentTime = 0;
+                    audio.play().then(() => {
+                        card.classList.add('playing');
+                    }).catch(err => alert("播放失敗：" + err.message));
+                }
             } else {
                 selectSingleSound(id);
             }
@@ -399,6 +406,7 @@
 
         async function removeSound(id) {
             if (confirm("確定要清除這個按鈕的音效嗎？")) {
+                stopSingleSound(id);
                 await deleteSound(id);
                 await loadSavedSound(id);
             }
@@ -406,7 +414,6 @@
 
         batchBtn.addEventListener('click', () => batchInput.click());
 
-        // 批次匯入支援到 16 個
         batchInput.addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
